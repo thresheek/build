@@ -308,7 +308,7 @@ install_common()
 			install_deb_chroot "armbian-config" "remote"
 		fi
 	fi
-
+read
 	# install armbian-zsh
 	if [[ "${REPOSITORY_INSTALL}" != *armbian-zsh* ]]; then
 		if [[ $BUILD_MINIMAL != yes ]]; then
