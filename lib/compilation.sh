@@ -654,8 +654,7 @@ compile_armbian-config()
 	Architecture: all
 	Maintainer: $MAINTAINER <$MAINTAINERMAIL>
 	Replaces: armbian-bsp, neofetch
-	Conflicts: neofetch
-	Depends: bash, iperf3, psmisc, curl, bc, expect, dialog, pv, zip \
+	Depends: bash, iperf3, psmisc, curl, bc, expect, dialog, pv, zip, \
 	debconf-utils, unzip, build-essential, html2text, apt-transport-https, html2text, dirmngr, software-properties-common, debconf
 	Recommends: armbian-bsp
 	Suggests: libpam-google-authenticator, qrencode, network-manager, sunxi-tools
@@ -665,6 +664,9 @@ compile_armbian-config()
 	END
 
 	install -m 755 "${SRC}"/cache/sources/neofetch/neofetch "${tmp_dir}/${armbian_config_dir}"/usr/bin/neofetch
+	cd "${tmp_dir}/${armbian_config_dir}"/usr/bin/
+	process_patch_file "${SRC}/patch/misc/add-armbian-neofetch.patch" "applying"
+
 	install -m 755 "${SRC}"/cache/sources/wireguard-manager/wireguard-manager.sh "${tmp_dir}/${armbian_config_dir}"/usr/bin/wireguard-manager
 	install -m 755 "${SRC}"/cache/sources/armbian-config/scripts/tv_grab_file "${tmp_dir}/${armbian_config_dir}"/usr/bin/tv_grab_file
 	install -m 755 "${SRC}"/cache/sources/armbian-config/debian-config "${tmp_dir}/${armbian_config_dir}"/usr/sbin/armbian-config
