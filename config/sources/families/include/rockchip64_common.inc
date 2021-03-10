@@ -8,7 +8,7 @@ BOOTDELAY=0
 OVERLAY_PREFIX='rockchip'
 SERIALCON=${SERIALCON:=$([ $BRANCH == "legacy" ] && echo "ttyFIQ0:1500000" || echo "ttyS2:1500000")}
 GOVERNOR="ondemand"
-BOOTBRANCH="tag:v2020.07"
+BOOTBRANCH="tag:v2020.10"
 PACKAGE_LIST_FAMILY="ethtool"
 
 RKBIN_DIR="$SRC/cache/sources/rkbin-tools"
@@ -25,7 +25,7 @@ else # rk3308, rk3328
 
 fi
 
-if [[ $BOARD == nanopi-r2s || $BOARD == rockpi-e || $BOARD == nanopineo3 || $BOARD == renegade || $BOARD == station-m1 ]]; then
+if [[ $BOARD == nanopi-r2s || $BOARD == rockpi-e || $BOARD == nanopineo3 || $BOARD == renegade || $BOARD == station-m1 || $BOARD == z28pro ]]; then
 
 	BOOT_USE_BLOBS=yes
 	BOOT_SOC=rk3328
@@ -49,6 +49,15 @@ elif [[ $BOARD == pinebook-pro ]]; then
 	ATFPATCHDIR='atf-rk3399'
 
 elif [[ $BOARD == rockpi-4* ]]; then
+
+	BOOT_USE_BLOBS=yes
+	BOOT_SUPPORT_SPI=yes
+	BOOT_SOC=rk3399
+	DDR_BLOB='rk33/rk3399_ddr_933MHz_v1.20.bin' # 1GB model does not boot with later versions
+	MINILOADER_BLOB='rk33/rk3399_miniloader_v1.19.bin'
+	BL31_BLOB='rk33/rk3399_bl31_v1.30.elf'
+
+elif [[ $BOARD == station-p1 ]]; then
 
 	BOOT_USE_BLOBS=yes
 	BOOT_SUPPORT_SPI=yes
@@ -83,7 +92,7 @@ case $BRANCH in
 	current)
 
 		KERNELPATCHDIR='rockchip64-'$BRANCH
-		KERNELBRANCH="branch:linux-5.9.y"
+		KERNELBRANCH="branch:linux-5.10.y"
 		LINUXFAMILY=rockchip64
 		LINUXCONFIG='linux-rockchip64-'$BRANCH
 
@@ -92,7 +101,7 @@ case $BRANCH in
 	dev)
 
 		KERNELPATCHDIR='rockchip64-'$BRANCH
-		KERNELBRANCH="branch:linux-5.10.y"
+		KERNELBRANCH="branch:linux-5.11.y"
 		LINUXFAMILY=rockchip64
 		LINUXCONFIG='linux-rockchip64-'$BRANCH
 
@@ -172,6 +181,18 @@ legacy_uboot_locations()
 
 uboot_custom_postprocess()
 {
+	if [ "$(uname -m)" = "aarch64" ]; then
+		if [ "$(lsb_release -sc)" = "focal" ]; then
+			PKG_PREFIX="qemu-x86_64-static -L /usr/x86_64-linux-gnu "
+		else
+			PKG_PREFIX="qemu-x86_64 -L /usr/x86_64-linux-gnu "
+		fi
+	else
+		PKG_PREFIX=""
+	fi
+
+	RKBIN_DIR="$SRC/cache/sources/rkbin-tools"
+
 	if [[ $BOOT_USE_MAINLINE_ATF == yes || $BOOT_USE_TPL_SPL_BLOB == yes ]]; then
 		:
 	elif [[ $BOOT_USE_BLOBS == yes ]]; then
@@ -179,8 +200,8 @@ uboot_custom_postprocess()
 		local tempfile=$(mktemp)
 		tools/mkimage -n $BOOT_SOC -T rksd -d $RKBIN_DIR/$DDR_BLOB idbloader.bin
 		cat $RKBIN_DIR/$MINILOADER_BLOB >> idbloader.bin
-		loaderimage --pack --uboot ./u-boot-dtb.bin uboot.img 0x200000
-		trust_merger --replace bl31.elf $RKBIN_DIR/$BL31_BLOB trust.ini
+		$PKG_PREFIX$RKBIN_DIR/tools/loaderimage --pack --uboot ./u-boot-dtb.bin uboot.img 0x200000
+		$PKG_PREFIX$RKBIN_DIR/tools/trust_merger --replace bl31.elf $RKBIN_DIR/$BL31_BLOB trust.ini
 
 	elif [[ $BOOT_RK3399_LEGACY_HYBRID == yes ]]; then
 
@@ -201,7 +222,7 @@ uboot_custom_postprocess()
 		# 3328
 		tools/mkimage -n rk3328 -T rksd -d $SRC/cache/sources/rkbin-tools/rk33/rk3328_ddr_786MHz_v1.13.bin idbloader.bin
 		cat $SRC/cache/sources/rkbin-tools/rk33/rk3328_miniloader_v2.46.bin >> idbloader.bin
-		loaderimage --pack --uboot ./u-boot-dtb.bin uboot.img 0x200000
+		$PKG_PREFIX$RKBIN_DIR/tools/loaderimage --pack --uboot ./u-boot-dtb.bin uboot.img 0x200000
 
 	else
 		echo "Unsupported u-boot processing configuration!"
@@ -277,7 +298,7 @@ atf_custom_postprocess()
 	# remove bl31.bin which can be 4+GiB in size and thus may fill the tmpfs mount
 	rm -f build/rk322xh/debug/bl31.bin
 	# ATF
-	trust_merger trust.ini
+	$PKG_PREFIX$RKBIN_DIR/tools/trust_merger trust.ini
 
 }
 
@@ -345,7 +366,7 @@ family_tweaks_bsp()
 		install -m 755 $SRC/packages/bsp/rk3399/brcm_patchram_plus_rk3399 $destination/usr/bin
 		cp $SRC/packages/bsp/rk3399/rk3399-bluetooth.service $destination/lib/systemd/system/
 
-		if [[ $BOARD == nanop*4* || $BOARD == firefly* ]]; then
+		if [[ $BOARD == nanop*4* || $BOARD == firefly* || $BOARD == orangepi-rk3399 ]]; then
 			sed -i s%BCM4345C5%BCM4356A2%g $destination/lib/systemd/system/rk3399-bluetooth.service
 		fi
 	fi
@@ -401,6 +422,7 @@ family_tweaks_bsp()
 		# UPS service
 		cp $SRC/packages/bsp/helios64/helios64-ups.service $destination/lib/systemd/system/
 		cp $SRC/packages/bsp/helios64/helios64-ups.timer $destination/lib/systemd/system/
+		install -m 755 $SRC/packages/bsp/helios64/helios64-ups.sh $destination/usr/bin/helios64-ups.sh
 
 	fi
 
